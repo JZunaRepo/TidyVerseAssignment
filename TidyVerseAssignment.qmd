@@ -1,0 +1,147 @@
+---
+title: "TidyVerseAssignment"
+author: "Jonnathan Zuna Largo"
+format: html
+editor: visual
+---
+
+## Data Science Careers & Salaries 2025
+
+Source: <https://www.kaggle.com/datasets/nalisha/data-science-careers-and-salaries-2025>.
+
+## Code
+
+```{r}
+library(tidyverse)
+
+url <- "https://raw.githubusercontent.com/JZunaRepo/TidyVerseAssignment/refs/heads/main/data_science_job_posts_2025.csv"
+
+jobs <- read.csv(
+  file = url
+)
+```
+
+```{r}
+glimpse(jobs)
+```
+
+Given that the salary has a range and values that contain quotations, we need to strip these signs and commas and extract the numbers to be able to compute them
+
+```{r}
+jobs <- jobs %>%
+  mutate(
+    salary_clean = str_remove_all(salary, "[€,]"),
+    salary_low = as.numeric(str_extract(salary_clean, "^\\d+")),
+    salary_high = as.numeric(str_extract(salary_clean, "\\d+$")),
+    salary_mid = if_else(salary_low != salary_high,
+                         (salary_low + salary_high) / 2,
+                         salary_low)
+  )
+```
+
+```{r}
+jobs %>%
+  select(salary, salary_low, salary_high, salary_mid) %>%
+  head(10)
+```
+
+The skills column also need cleaning. We can achieve this by formatting and expand each skill to its own row
+
+```{r}
+skills_long <- jobs %>%
+  select(job_title, seniority_level, industry, skills) %>%
+  mutate(
+    skills_clean = str_remove_all(skills, "[\\[\\]\\']"),
+    skills_list = str_split(skills_clean, ",\\s*")
+  ) %>%
+  unnest(skills_list) %>%
+  mutate(
+    skills_list = str_trim(skills_list)
+  ) %>%
+  filter(skills_list != "")
+head(skills_long, 10)
+```
+
+Now we can observe all the skills in order by most frequent skill
+
+```{r}
+top_skills <- skills_long %>%
+  count(skills_list, sort = TRUE) %>%
+  slice_head(n = 15)
+
+top_skills
+```
+
+We can also graph and visualize the skills by frequency
+
+```{r}
+top_skills %>%
+  mutate(skills_list = fct_reorder(skills_list, n)) %>%
+  ggplot(aes(x = n, y = skills_list)) +
+  geom_col(fill = "#2c7bb6") +
+  geom_text(aes(label = n), hjust = -0.2, size = 3.5) +
+  labs(
+    title = "Top 15 Most In-Demand Skills in Data Science Job Postings (2025)",
+    x = "Number of Job Postings",
+    y = "Skill",
+    caption = "Source: Data Science Job Posts 2025"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 13, face = "bold"),
+    axis.text.y = element_text(size = 11)
+  ) +
+  scale_x_continuous(expand = expansion(mult = c(0, 0.1)))
+```
+
+We can also observe the salary distributrion by seniority level
+
+```{r}
+jobs %>%
+  filter(seniority_level != "") %>%
+  ggplot(aes(x = fct_reorder(seniority_level, salary_mid), y = salary_mid)) +
+  geom_boxplot(fill = "#2c7bb6", alpha = 0.6, outlier.shape = NA) +
+  geom_jitter(width = 0.2, alpha = 0.25, color = "#1a1a2e", size = 1.2) +
+  coord_cartesian(ylim = c(0, 400000)) +
+  labs(
+    title = "Salary Distribution by Seniority Level (2025)",
+    x = "Seniority Level",
+    y = "Salary (€)",
+    caption = "Source: Data Science Job Posts 2025"
+  ) +
+  scale_y_continuous(labels = scales::comma) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 13, face = "bold"),
+    axis.text.x = element_text(size = 11)
+  )
+```
+
+And look at top companies hiring data scientists roles
+
+```{r}
+jobs %>%
+  filter(industry != "") %>%
+  count(industry, sort = TRUE) %>%
+  slice_head(n = 10) %>%
+  mutate(industry = fct_reorder(industry, n)) %>%
+  ggplot(aes(x = n, y = industry)) +
+  geom_col(fill = "#2c7bb6") +
+  geom_text(aes(label = n), hjust = -0.2, size = 3.5) +
+  labs(
+    title = "Top 10 Industries Hiring Data Scientists (2025)",
+    x = "Number of Job Postings",
+    y = "Industry",
+    caption = "Source: Data Science Job Posts 2025"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 13, face = "bold"),
+    axis.text.y = element_text(size = 11)
+  ) +
+  scale_x_continuous(expand = expansion(mult = c(0, 0.1)))
+```
+
+## Conclusion
+
+This bignette wakled trhough a complete data wrangling and visualization workflow using the following pakacges from Tidyverse: dplyr, tidyr, and ggplot2. These packages were applied to the kaggle datasets of job postings from 2025. The analysis revealed that Python and machine learning are by far the most in-demand skills in the current job market, with SQL and R close behind. Technology unsurprisingly leads all industries in both hiring volume and average compensation, though Finance and Healthcare also showed strong representation.
